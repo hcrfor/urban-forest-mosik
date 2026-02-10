@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>도시산림 개황모식도 분석기</title>
+    <style>
+        /* 1. 디자인 가이드: 산림 테마 다크 모드 */
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --primary-green: #2d5a27;
+            --accent-green: #4caf50;
+            --text-color: #e0e0e0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
+        header h1 {
+            color: var(--accent-green);
+            margin-bottom: 5px;
+            font-size: 1.5rem;
+        }
+
+        header p {
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
+
+        /* 카드 UI */
+        .card {
+            background: var(--surface-color);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: left;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        input[type="password"],
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: #252525;
+            color: white;
+            font-size: 1rem;
+        }
+
+        button {
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: none;
+            background: var(--primary-green);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+            font-size: 1rem;
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        button.saved {
+            background: var(--accent-green) !important;
+        }
+
+        /* 안내 문구 */
+        .help-text {
+            color: var(--accent-green);
+            font-size: 0.9em;
+            margin-top: 12px;
+            font-weight: bold;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* 업로드 및 분석 버튼 */
+        .upload-label {
+            display: block;
+            background: var(--primary-green);
+            padding: 18px;
+            border-radius: 12px;
+            margin-top: 20px;
+            color: white;
+            font-size: 1.1em;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        #preview-img {
+            width: 100%;
+            border-radius: 12px;
+            margin-top: 15px;
+            border: 1px solid #333;
+            display: block;
+        }
+
+        /* 결과 테이블 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: #252525;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th,
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #333;
+            text-align: center;
+        }
+
+        th {
+            background: #333;
+            color: var(--accent-green);
+            font-size: 0.9rem;
+        }
+
+        .total-row {
+            font-weight: bold;
+            background: #1e1e1e;
+            border-top: 2px solid var(--accent-green);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>도시산림 개황모식도 분석기</h1>
+            <p>AI 기반 지피식생 비율 자동 산출</p>
+        </header>
+
+        <div class="card">
+            <label style="font-weight: bold; font-size: 0.9rem;">API 설정 (Gemini API Key)</label>
+            <div class="input-group">
+                <input type="password" id="api-key" placeholder="API 키를 입력하세요">
+                <button id="save-btn">저장하기</button>
+            </div>
+            <p id="help-msg" class="help-text hidden">✔ 사진촬영 또는 업로드를 해주세요</p>
+        </div>
+
+        <label for="file-input" class="upload-label">📷 사진 촬영 / 업로드</label>
+        <input type="file" id="file-input" accept="image/*" style="display:none">
+
+        <div id="preview-area" class="hidden">
+            <img id="preview-img" src="">
+            <button id="analyze-btn" style="width:100%; margin-top:15px; font-size: 1.2em; height: 60px;">분석하기</button>
+        </div>
+
+        <div id="result-area" class="card hidden" style="margin-top: 30px;">
+            <h3 style="color: var(--accent-green); margin: 0 0 15px 0;">분석 결과</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>항목명 (수정가능)</th>
+                        <th>비율 (%)</th>
+                    </tr>
+                </thead>
+                <tbody id="result-table-body"></tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td>합계</td>
+                        <td id="total-val">100%</td>
+                    </tr>
+                </tfoot>
+            </table>
+            <p style="font-size: 0.8rem; color: #888; margin-top: 15px;">* 항목명을 터치하여 실제 이름으로 수정할 수 있습니다.</p>
+        </div>
+    </div>
+
+    <script type="module">
+        // Google Generative AI SDK 로드
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+
+        const saveBtn = document.getElementById('save-btn');
+        const apiKeyInput = document.getElementById('api-key');
+        const helpMsg = document.getElementById('help-msg');
+        const fileInput = document.getElementById('file-input');
+        const previewArea = document.getElementById('preview-area');
+        const previewImg = document.getElementById('preview-img');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const resultArea = document.getElementById('result-area');
+        const resultTableBody = document.getElementById('result-table-body');
+
+        // [기능 1] API Key 저장 및 UI 상태 변경
+        function setSavedState() {
+            saveBtn.textContent = '저장 완료';
+            saveBtn.classList.add('saved');
+            helpMsg.classList.remove('hidden');
+        }
+
+        const savedKey = localStorage.getItem('gemini_key');
+        if (savedKey) {
+            apiKeyInput.value = savedKey;
+            setSavedState();
+        }
+
+        saveBtn.addEventListener('click', () => {
+            const key = apiKeyInput.value.trim();
+            if (key) {
+                localStorage.setItem('gemini_key', key);
+                setSavedState();
+                alert('API 키가 브라우저에 저장되었습니다.');
+            } else {
+                alert('API 키를 입력해 주세요');
+            }
+        });
+
+        apiKeyInput.addEventListener('input', () => {
+            saveBtn.textContent = '저장하기';
+            saveBtn.classList.remove('saved');
+        });
+
+        // [기능 2] 이미지 업로드 및 미리보기
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    previewImg.src = event.target.result;
+                    previewArea.classList.remove('hidden');
+                    resultArea.classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // [기능 3] AI 분석 실행 (Gemini 1.5 Flash 최적화)
+        analyzeBtn.addEventListener('click', async () => {
+            const apiKey = localStorage.getItem('gemini_key');
+            if (!apiKey) {
+                alert('API 키를 먼저 저장해 주세요.');
+                return;
+            }
+
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = 'AI 분석 중...';
+
+            try {
+                const genAI = new GoogleGenerativeAI(apiKey);
+                // 서버 환경에서 가장 안정적인 모델 명칭 사용
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+                const base64Data = previewImg.src.split(',')[1];
+
+                const prompt = `
+                    첨부된 이미지는 산림 표본점 개황모식도입니다.
+                    1. 원형 플롯 안에 손글씨로 적힌 지피식생(잔디, 나지, 암석, 아스팔트 등) 항목을 식별하세요.
+                    2. '영산홍', '회양목' 같은 나무 이름은 무시하고, 해당 위치의 바닥 속성(지피식생)으로 포함하세요.
+                    3. 각 항목의 면적 비율을 5% 단위로 산출하세요.
+                    4. 모든 항목의 비율 합계는 정확히 100%가 되어야 합니다.
+                    5. 오직 다음 JSON 형식으로만 답변하세요: [{"name": "항목명", "percentage": 20}]
+                `;
+
+                const result = await model.generateContent([
+                    prompt,
+                    { inlineData: { data: base64Data, mimeType: "image/jpeg" } }
+                ]);
+
+                const responseText = result.response.text();
+                // JSON만 추출하기 위한 정규식 처리
+                const jsonMatch = responseText.match(/\[.*\]/s);
+                if (!jsonMatch) throw new Error("AI가 결과 데이터를 생성하지 못했습니다. 다시 시도해 주세요.");
+
+                const data = JSON.parse(jsonMatch[0]);
+
+                // 결과 렌더링
+                resultTableBody.innerHTML = '';
+                data.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><input type="text" value="${item.name}" style="background:none; border:none; color:white; text-align:center; width:100%; font-size:1rem;"></td>
+                        <td style="font-weight:bold; color:var(--accent-green);">${item.percentage}%</td>
+                    `;
+                    resultTableBody.appendChild(row);
+                });
+
+                resultArea.classList.remove('hidden');
+                resultArea.scrollIntoView({ behavior: 'smooth' });
+
+            } catch (error) {
+                console.error("에러 상세:", error);
+                alert(`분석 중 오류 발생: ${error.message}\n\n팁: Vercel에 배포한 후 HTTPS 주소에서 실행하면 해결될 수 있습니다.`);
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = '분석하기';
+            }
+        });
+    </script>
+</body>
+
+</html>
