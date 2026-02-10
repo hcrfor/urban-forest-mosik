@@ -271,7 +271,7 @@
             try {
                 const genAI = new GoogleGenerativeAI(apiKey);
                 // 서버 환경에서 가장 안정적인 모델 명칭 사용
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
 
                 const base64Data = previewImg.src.split(',')[1];
 
