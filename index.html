@@ -142,8 +142,20 @@
             <p id="help-msg" class="help-text hidden">✔ 사진촬영 또는 업로드를 해주세요</p>
         </div>
 
-        <label for="file-input" class="upload-label">📷 사진 촬영 / 업로드</label>
-        <input type="file" id="file-input" accept="image/*" style="display:none">
+        <div class="button-group" style="display: flex; gap: 10px; margin-top: 20px;">
+            <button id="camera-btn"
+                style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                <span>📷</span> 사진 촬영
+            </button>
+            <button id="upload-btn"
+                style="flex: 1; background: #555; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                <span>📁</span> 이미지 업로드
+            </button>
+        </div>
+
+        <!-- Hidden Inputs -->
+        <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none">
+        <input type="file" id="upload-input" accept="image/*" style="display:none">
 
         <div id="preview-area" class="hidden">
             <img id="preview-img" src="">
@@ -165,12 +177,18 @@
     </div>
 
     <script type="module">
-        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai@0.21.0";
 
         const saveBtn = document.getElementById('save-btn');
         const apiKeyInput = document.getElementById('api-key');
         const helpMsg = document.getElementById('help-msg');
-        const fileInput = document.getElementById('file-input');
+
+        // New Elements
+        const cameraBtn = document.getElementById('camera-btn');
+        const uploadBtn = document.getElementById('upload-btn');
+        const cameraInput = document.getElementById('camera-input');
+        const uploadInput = document.getElementById('upload-input');
+
         const previewArea = document.getElementById('preview-area');
         const previewImg = document.getElementById('preview-img');
         const analyzeBtn = document.getElementById('analyze-btn');
@@ -181,11 +199,10 @@
             if (isSaved) {
                 saveBtn.textContent = '저장 완료';
                 saveBtn.classList.add('saved');
-                helpMsg.classList.remove('hidden');
+                helpMsg.remove(); // 기존 메시지 요소 제거 (새로운 버튼이 있으므로)
             } else {
                 saveBtn.textContent = '저장하기';
                 saveBtn.classList.remove('saved');
-                helpMsg.classList.add('hidden');
             }
         }
 
@@ -206,8 +223,8 @@
 
         apiKeyInput.addEventListener('input', () => updateSavedState(false));
 
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
+        // Common File Handler
+        function handleFile(file) {
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (event) => {
@@ -217,7 +234,15 @@
                 };
                 reader.readAsDataURL(file);
             }
-        });
+        }
+
+        // Button Event Listeners
+        cameraBtn.addEventListener('click', () => cameraInput.click());
+        uploadBtn.addEventListener('click', () => uploadInput.click());
+
+        // Input Change Listeners
+        cameraInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+        uploadInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
 
         analyzeBtn.addEventListener('click', async () => {
             const apiKey = localStorage.getItem('gemini_key');
@@ -228,7 +253,6 @@
 
             try {
                 const genAI = new GoogleGenerativeAI(apiKey);
-                // 모델 이름을 'gemini-1.5-flash'로 명시
                 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
                 const base64Data = previewImg.src.split(',')[1];
@@ -253,7 +277,13 @@
 
             } catch (error) {
                 console.error("상세 에러:", error);
-                alert(`분석 오류: ${error.message}\n\n팁: Vercel 주소에서도 API 키를 다시 한번 저장한 후 시도해 보세요.`);
+
+                let errorMsg = error.message;
+                if (error.message.includes("404")) {
+                    errorMsg = "모델을 찾을 수 없습니다. (404)\nGemini API 키가 유효한지, 또는 해당 계정에서 gemini-1.5-flash 모델을 사용할 수 있는지 확인해주세요.";
+                }
+
+                alert(`분석 오류: ${errorMsg}`);
             } finally {
                 analyzeBtn.disabled = false;
                 analyzeBtn.textContent = '분석하기';
